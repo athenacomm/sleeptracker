@@ -8,13 +8,13 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
-# Connect to Google Sheet
+# Connect to Google Sheet by ID
 def get_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
     credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
     gc = gspread.authorize(credentials)
-    sheet = gc.open("Sleep Tracker Log").sheet1  # Must match your sheet's name exactly
+    sheet = gc.open_by_key("1fosTXWSqxBzHmE_FbBtD2zWe4l8jo6m7GxFTRkw0FAQ").sheet1
     return sheet
 
 # Load sleep data from Google Sheet
