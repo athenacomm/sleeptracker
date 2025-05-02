@@ -3,38 +3,63 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-import json
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from gspread_dataframe import get_as_dataframe, set_with_dataframe
+import requests
 
-# Connect to Google Sheet by ID
-def get_sheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
-    gc = gspread.authorize(credentials)
-    sheet = gc.open_by_key("1R9u3t0yb5SC5LRGJRJpTsLsWopAmgWjpYlZbrnqppyI").sheet1
-    return sheet
-
-# Load sleep data from Google Sheet
+# Load data from Airtable
 def load_data():
-    sheet = get_sheet()
-    df = get_as_dataframe(sheet).dropna(how='all')
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
+    url = f"https://api.airtable.com/v0/{st.secrets['AIRTABLE_BASE_ID']}/{st.secrets['AIRTABLE_TABLE_ID']}"
+    headers = {
+        "Authorization": f"Bearer {st.secrets['AIRTABLE_TOKEN']}"
+    }
+    all_records = []
+    offset = None
+
+    while True:
+        params = {"offset": offset} if offset else {}
+        response = requests.get(url, headers=headers, params=params)
+        data = response.json()
+        all_records.extend(data["records"])
+        offset = data.get("offset")
+        if not offset:
+            break
+
+    if not all_records:
+        return pd.DataFrame(columns=["date", "hours", "type", "person"])
+
+    rows = []
+    for record in all_records:
+        fields = record["fields"]
+        rows.append([
+            fields.get("date"),
+            fields.get("hours"),
+            fields.get("type"),
+            fields.get("person")
+        ])
+
+    df = pd.DataFrame(rows, columns=["date", "hours", "type", "person"])
+    df["date"] = pd.to_datetime(df["date"])
     return df
 
-# Save a new entry to Google Sheet
+# Save entry to Airtable
 def save_entry(date, hours, sleep_type, person):
-    sheet = get_sheet()
-    df = load_data()
-    new_row = pd.DataFrame([[date, hours, sleep_type, person]], columns=["date", "hours", "type", "person"])
-    updated_df = pd.concat([df, new_row], ignore_index=True)
-    sheet.clear()
-    set_with_dataframe(sheet, updated_df)
+    url = f"https://api.airtable.com/v0/{st.secrets['AIRTABLE_BASE_ID']}/{st.secrets['AIRTABLE_TABLE_ID']}"
+    headers = {
+        "Authorization": f"Bearer {st.secrets['AIRTABLE_TOKEN']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "fields": {
+            "date": date.strftime("%Y-%m-%d"),
+            "hours": hours,
+            "type": sleep_type,
+            "person": person
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code not in [200, 201]:
+        st.error(f"Failed to save entry: {response.text}")
 
-# Format ordinal suffix for dates (1st, 2nd, 3rd, etc.)
+# Format ordinal suffix for dates
 def add_suffix(d):
     if 11 <= d <= 13:
         return 'th'
@@ -51,12 +76,10 @@ def plot_sleep(data, person_filter, days):
         st.write("No data to display.")
         return
 
-    # Add formatted date column
     recent_data["formatted_date"] = recent_data["date"].apply(
         lambda d: f"{d.strftime('%A')} {d.day}{add_suffix(d.day)} {d.strftime('%B %Y')}"
     )
 
-    # Group by formatted date and person
     daily_totals = recent_data.groupby(["formatted_date", "person"])["hours"].sum().unstack().fillna(0)
 
     fig, ax = plt.subplots()
