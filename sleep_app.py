@@ -14,7 +14,7 @@ def get_sheet():
     creds = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
     credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
     gc = gspread.authorize(credentials)
-    sheet = gc.open_by_key("1fosTXWSqxBzHmE_FbBtD2zWe4l8jo6m7GxFTRkw0FAQ").sheet1
+    sheet = gc.open_by_key("1R9u3t0yb5SC5LRGJRJpTsLsWopAmgWjpYlZbrnqppyI").sheet1
     return sheet
 
 # Load sleep data from Google Sheet
