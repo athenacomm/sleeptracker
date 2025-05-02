@@ -3,26 +3,36 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
-# File where data will be stored
-DATA_FILE = "sleep_data.csv"
+# Connect to Google Sheet
+def get_sheet():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds, scope)
+    gc = gspread.authorize(credentials)
+    sheet = gc.open("Sleep Tracker Log").sheet1  # Must match your sheet's name exactly
+    return sheet
 
-# Load sleep data from the file
+# Load sleep data from Google Sheet
 def load_data():
-    try:
-        return pd.read_csv(DATA_FILE, parse_dates=['date'])
-    except FileNotFoundError:
-        return pd.DataFrame(columns=["date", "hours", "type", "person"])
+    sheet = get_sheet()
+    df = get_as_dataframe(sheet).dropna(how='all')
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
+    return df
 
-# Save a new entry to the file
+# Save a new entry to Google Sheet
 def save_entry(date, hours, sleep_type, person):
-    new_row = pd.DataFrame([[date, hours, sleep_type, person]],
-                           columns=["date", "hours", "type", "person"])
-    try:
-        pd.read_csv(DATA_FILE)
-        new_row.to_csv(DATA_FILE, mode='a', index=False, header=False)
-    except FileNotFoundError:
-        new_row.to_csv(DATA_FILE, index=False)
+    sheet = get_sheet()
+    df = load_data()
+    new_row = pd.DataFrame([[date, hours, sleep_type, person]], columns=["date", "hours", "type", "person"])
+    updated_df = pd.concat([df, new_row], ignore_index=True)
+    sheet.clear()
+    set_with_dataframe(sheet, updated_df)
 
 # Format ordinal suffix for dates (1st, 2nd, 3rd, etc.)
 def add_suffix(d):
