@@ -18,7 +18,7 @@ def load_data():
         params = {"offset": offset} if offset else {}
         response = requests.get(url, headers=headers, params=params)
         data = response.json()
-        all_records.extend(data["records"])
+        all_records.extend(data.get("records", []))  # safe even if table is empty
         offset = data.get("offset")
         if not offset:
             break
