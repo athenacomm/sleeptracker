@@ -65,7 +65,7 @@ def add_suffix(d):
         return 'th'
     return {1: 'st', 2: 'nd', 3: 'rd'}.get(d % 10, 'th')
 
-# Plot rolling 5-day average
+# Plot rolling 5-day average sleep
 def plot_average_sleep(data):
     today = pd.Timestamp.today().normalize()
     five_days_ago = today - pd.Timedelta(days=5)
@@ -76,13 +76,16 @@ def plot_average_sleep(data):
         st.write("No recent data to calculate averages.")
         return
 
-    averages = recent_data.groupby("person")["hours"].mean().sort_values()
+    # Get daily totals per person
+    daily_totals = recent_data.groupby(["person", "date"])["hours"].sum().reset_index()
 
+    # Average those daily totals per person
+    averages = daily_totals.groupby("person")["hours"].mean().sort_values()
+
+    # Use default matplotlib colours
     fig, ax = plt.subplots()
-    cmap = plt.get_cmap("twilight")
-    colours = [cmap(i / len(averages)) for i in range(len(averages))]
-
-    averages.plot(kind="barh", color=colours, ax=ax)
+    colours = ['#1f77b4', '#ff7f0e']  # Default matplotlib bar colours
+    averages.plot(kind="barh", color=colours[:len(averages)], ax=ax)
     ax.set_xlabel("Average Hours Slept")
     ax.set_title("5-Day Rolling Average Sleep (up to today)")
     st.pyplot(fig)
@@ -104,13 +107,11 @@ def plot_sleep(data, person_filter, days):
 
     daily_totals = recent_data.groupby(["formatted_date", "person"])["hours"].sum().unstack().fillna(0)
 
-    # Sort by date descending (latest on the left)
+    # Sort dates descending (latest left)
     daily_totals = daily_totals.iloc[::-1]
 
     fig, ax = plt.subplots()
-    cmap = plt.get_cmap("twilight")
-    colours = [cmap(i / len(daily_totals.columns)) for i in range(len(daily_totals.columns))]
-    daily_totals.plot(kind="bar", stacked=False, ax=ax, color=colours)
+    daily_totals.plot(kind="bar", stacked=False, ax=ax)  # original colours preserved
     ax.set_ylabel("Hours slept")
     ax.set_title(f"Sleep in last {days} days")
     st.pyplot(fig)
