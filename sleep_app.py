@@ -18,7 +18,7 @@ def load_data():
         params = {"offset": offset} if offset else {}
         response = requests.get(url, headers=headers, params=params)
         data = response.json()
-        all_records.extend(data.get("records", []))  # safe even if table is empty
+        all_records.extend(data.get("records", []))
         offset = data.get("offset")
         if not offset:
             break
@@ -65,6 +65,16 @@ def add_suffix(d):
         return 'th'
     return {1: 'st', 2: 'nd', 3: 'rd'}.get(d % 10, 'th')
 
+# Draw the average sleep chart
+def plot_average_sleep(data):
+    averages = data.groupby("person")["hours"].mean().sort_values()
+    fig, ax = plt.subplots()
+    colours = plt.get_cmap("twilight")(range(len(averages)))
+    averages.plot(kind="barh", color=colours, ax=ax)
+    ax.set_xlabel("Average Hours Slept")
+    ax.set_title("Average Sleep Times per Person")
+    st.pyplot(fig)
+
 # Draw the chart
 def plot_sleep(data, person_filter, days):
     if person_filter != "Both":
@@ -82,8 +92,12 @@ def plot_sleep(data, person_filter, days):
 
     daily_totals = recent_data.groupby(["formatted_date", "person"])["hours"].sum().unstack().fillna(0)
 
+    # Sort by date descending
+    daily_totals = daily_totals.iloc[::-1]
+
     fig, ax = plt.subplots()
-    daily_totals.plot(kind="bar", stacked=False, ax=ax)
+    colours = plt.get_cmap("twilight")(range(len(daily_totals.columns)))
+    daily_totals.plot(kind="bar", stacked=False, ax=ax, color=colours)
     ax.set_ylabel("Hours slept")
     ax.set_title(f"Sleep in last {days} days")
     st.pyplot(fig)
@@ -105,10 +119,18 @@ with st.form("sleep_form"):
         save_entry(date, hours, sleep_type, person)
         st.success("Saved!")
 
-st.subheader("Sleep Visualisation")
-
+# Load data
 data = load_data()
+
+# Average sleep section
+st.subheader("Average Sleep Times")
+if data.empty:
+    st.write("No data to calculate averages.")
+else:
+    plot_average_sleep(data)
+
+# Sleep visualisation section
+st.subheader("Sleep Visualisation")
 person_filter = st.selectbox("View sleep for", ["Both", "Lloyd", "Georgia"])
 days = st.slider("Show data for how many days?", 3, 60, 7)
-
 plot_sleep(data, person_filter, days)
