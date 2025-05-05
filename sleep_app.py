@@ -76,21 +76,17 @@ def plot_average_sleep(data):
         st.write("No recent data to calculate averages.")
         return
 
-    # Get daily totals per person
     daily_totals = recent_data.groupby(["person", "date"])["hours"].sum().reset_index()
-
-    # Average those daily totals per person
     averages = daily_totals.groupby("person")["hours"].mean().sort_values()
 
-    # Use default matplotlib colours
     fig, ax = plt.subplots()
-    colours = ['#1f77b4', '#ff7f0e']  # Default matplotlib bar colours
+    colours = ['#1f77b4', '#ff7f0e']  # Original matplotlib colours
     averages.plot(kind="barh", color=colours[:len(averages)], ax=ax)
     ax.set_xlabel("Average Hours Slept")
     ax.set_title("5-Day Rolling Average Sleep (up to today)")
     st.pyplot(fig)
 
-# Draw the main sleep chart
+# Plot sleep data by day
 def plot_sleep(data, person_filter, days):
     if person_filter != "Both":
         data = data[data["person"] == person_filter]
@@ -101,17 +97,26 @@ def plot_sleep(data, person_filter, days):
         st.write("No data to display.")
         return
 
+    # Add formatted date label
     recent_data["formatted_date"] = recent_data["date"].apply(
         lambda d: f"{d.strftime('%A')} {d.day}{add_suffix(d.day)} {d.strftime('%B %Y')}"
     )
 
-    daily_totals = recent_data.groupby(["formatted_date", "person"])["hours"].sum().unstack().fillna(0)
+    # Preserve sort by actual date
+    recent_data["sort_key"] = recent_data["date"]
+    grouped = recent_data.groupby(["sort_key", "person"]).agg({
+        "hours": "sum",
+        "formatted_date": "first"
+    }).reset_index()
 
-    # Sort dates descending (latest left)
-    daily_totals = daily_totals.iloc[::-1]
+    pivot = grouped.pivot(index="formatted_date", columns="person", values="hours").fillna(0)
+
+    # Sort so latest dates appear on the left
+    date_order = grouped.drop_duplicates("formatted_date").sort_values("sort_key", ascending=False)["formatted_date"]
+    pivot = pivot.loc[date_order]
 
     fig, ax = plt.subplots()
-    daily_totals.plot(kind="bar", stacked=False, ax=ax)  # original colours preserved
+    pivot.plot(kind="bar", stacked=False, ax=ax)
     ax.set_ylabel("Hours slept")
     ax.set_title(f"Sleep in last {days} days")
     st.pyplot(fig)
