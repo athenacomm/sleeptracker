@@ -36,8 +36,8 @@ def load_data():
         ])
 
     df = pd.DataFrame(rows, columns=["date", "ml", "feed_type", "Createdtime"])
-    df["date"] = pd.to_datetime(df["date"])
-    df["Createdtime"] = pd.to_datetime(df["Createdtime"])
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["Createdtime"] = pd.to_datetime(df["Createdtime"], errors="coerce")
     return df
 
 # Save entry to Airtable
@@ -74,17 +74,24 @@ def plot_feedings(data, days):
     ax.set_title(f"Milk Intake Over Last {days} Days")
     st.pyplot(fig)
 
-# Streamlit App
+# --- Streamlit App ---
 st.title("Baby Feeding Tracker")
 
-# Show time since last feed
+# Load data first
 data = load_data()
-if not data.empty:
-    last_feed_time = data["Createdtime"].max()
-    time_since = datetime.now() - last_feed_time
-    hours, remainder = divmod(time_since.total_seconds(), 3600)
-    minutes = remainder // 60
-    st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
+
+# Show time since last feed
+if not data.empty and "Createdtime" in data.columns and pd.notnull(data["Createdtime"]).any():
+    last_feed_time = pd.to_datetime(data["Createdtime"].max(), errors="coerce")
+    if pd.notnull(last_feed_time):
+        time_since = datetime.now() - last_feed_time
+        hours, remainder = divmod(time_since.total_seconds(), 3600)
+        minutes = remainder // 60
+        st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
+    else:
+        st.warning("Unable to parse feed time.")
+else:
+    st.warning("No timestamp available to calculate time since last feed.")
 
 # Log a feed
 st.subheader("Log a Feed")
@@ -99,7 +106,7 @@ with st.form("feeding_form"):
         save_entry(date, ml, feed_type)
         st.success("Entry saved!")
 
-# Show chart
+# Feeding chart
 st.subheader("Feeding Overview")
 days = st.slider("Show data for how many days?", 1, 30, 7)
 plot_feedings(data, days)
