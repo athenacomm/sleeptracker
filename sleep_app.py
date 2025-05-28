@@ -28,4 +28,70 @@ def load_data():
 
     rows = []
     for record in all_records:
-        fields
+        fields = record["fields"]
+        rows.append([
+            fields.get("date"),
+            fields.get("ml"),
+            fields.get("type")
+        ])
+
+    df = pd.DataFrame(rows, columns=["date", "ml", "type"])
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+# Save entry to Airtable
+def save_entry(date, ml, milk_type):
+    url = f"https://api.airtable.com/v0/{st.secrets['AIRTABLE_BASE_ID']}/{st.secrets['AIRTABLE_TABLE_ID']}"
+    headers = {
+        "Authorization": f"Bearer {st.secrets['AIRTABLE_TOKEN']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "fields": {
+            "date": date.strftime("%Y-%m-%d"),
+            "ml": ml,
+            "type": milk_type
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code not in [200, 201]:
+        st.error(f"Failed to save entry: {response.text}")
+
+# Draw feeding chart
+def plot_feedings(data, days):
+    recent_data = data[data["date"] >= pd.Timestamp.today() - pd.Timedelta(days=days)]
+    if recent_data.empty:
+        st.write("No data to display.")
+        return
+
+    daily_totals = recent_data.groupby([recent_data["date"].dt.date, "type"])["ml"].sum().unstack().fillna(0)
+    daily_totals = daily_totals.sort_index(ascending=False)
+
+    fig, ax = plt.subplots()
+    daily_totals.plot(kind="bar", stacked=True, ax=ax, color=["#1f77b4", "#ff7f0e"])
+    ax.set_ylabel("ml")
+    ax.set_title(f"Milk Intake Over Last {days} Days")
+    st.pyplot(fig)
+
+# Streamlit App
+st.title("Baby Feeding Tracker")
+
+st.subheader("Log a Feed")
+
+with st.form("feeding_form"):
+    date = st.date_input("Date", value=datetime.today())
+    ml = st.number_input("Amount of milk (ml)", min_value=0, max_value=1000, step=10)
+    milk_type = st.selectbox("Milk Type", ["Bottle", "Formula"])
+    submitted = st.form_submit_button("Save")
+
+    if submitted:
+        save_entry(date, ml, milk_type)
+        st.success("Entry saved!")
+
+# Load and display data
+data = load_data()
+
+st.subheader("Feeding Overview")
+days = st.slider("Show data for how many days?", 1, 30, 7)
+plot_feedings(data, days)
+
