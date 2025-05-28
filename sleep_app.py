@@ -77,21 +77,28 @@ def plot_feedings(data, days):
 # --- Streamlit App ---
 st.title("Baby Feeding Tracker")
 
-# Load data first
+# Load data
 data = load_data()
 
-# Show time since last feed
-if not data.empty and "Createdtime" in data.columns and pd.notnull(data["Createdtime"]).any():
-    last_feed_time = pd.to_datetime(data["Createdtime"].max(), errors="coerce")
-    if pd.notnull(last_feed_time):
-        time_since = datetime.now() - last_feed_time
-        hours, remainder = divmod(time_since.total_seconds(), 3600)
-        minutes = remainder // 60
-        st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
-    else:
-        st.warning("Unable to parse feed time.")
+# Show time since last feed (safe version)
+st.subheader("Time Since Last Feed")
+
+valid_times = data["Createdtime"].dropna() if "Createdtime" in data.columns else pd.Series()
+
+if not valid_times.empty:
+    try:
+        last_feed_time = pd.to_datetime(valid_times.max(), errors="coerce")
+        if pd.notnull(last_feed_time):
+            time_since = datetime.now() - last_feed_time.to_pydatetime()
+            hours, remainder = divmod(time_since.total_seconds(), 3600)
+            minutes = remainder // 60
+            st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
+        else:
+            st.warning("Unable to read timestamp.")
+    except Exception as e:
+        st.error(f"Error calculating time: {e}")
 else:
-    st.warning("No timestamp available to calculate time since last feed.")
+    st.warning("No feed times available.")
 
 # Log a feed
 st.subheader("Log a Feed")
@@ -110,3 +117,4 @@ with st.form("feeding_form"):
 st.subheader("Feeding Overview")
 days = st.slider("Show data for how many days?", 1, 30, 7)
 plot_feedings(data, days)
+
