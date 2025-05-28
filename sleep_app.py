@@ -97,4 +97,13 @@ with st.form("feeding_form"):
     submitted = st.form_submit_button("Save")
 
     if submitted:
-        save_entry(dat_
+        save_entry(date, ml, feed_type)
+        st.session_state.timestamps.append(datetime.now())
+        st.success("Entry saved!")
+
+# Show chart
+data = load_data()
+st.subheader("Feeding Overview")
+days = st.slider("Show data for how many days?", 1, 30, 7)
+plot_feedings(data, days)
+
