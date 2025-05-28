@@ -1,9 +1,12 @@
-# Import libraries
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
+
+# Track timestamps in session state
+if "timestamps" not in st.session_state:
+    st.session_state.timestamps = []
 
 # Load data from Airtable
 def load_data():
@@ -73,9 +76,18 @@ def plot_feedings(data, days):
     ax.set_title(f"Milk Intake Over Last {days} Days")
     st.pyplot(fig)
 
-# Streamlit App
+# --- Streamlit App Interface ---
 st.title("Baby Feeding Tracker")
 
+# Show time since last feed
+if st.session_state.timestamps:
+    last_time = st.session_state.timestamps[-1]
+    time_since = datetime.now() - last_time
+    hours, remainder = divmod(time_since.total_seconds(), 3600)
+    minutes = remainder // 60
+    st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
+
+# Log new feed
 st.subheader("Log a Feed")
 
 with st.form("feeding_form"):
@@ -85,14 +97,4 @@ with st.form("feeding_form"):
     submitted = st.form_submit_button("Save")
 
     if submitted:
-        save_entry(date, ml, feed_type)
-        st.success("Entry saved!")
-
-# Load and display data
-data = load_data()
-
-st.subheader("Feeding Overview")
-days = st.slider("Show data for how many days?", 1, 30, 7)
-plot_feedings(data, days)
-
-
+        save_entry(dat_
