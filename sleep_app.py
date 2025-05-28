@@ -24,7 +24,7 @@ def load_data():
             break
 
     if not all_records:
-        return pd.DataFrame(columns=["date", "ml", "type"])
+        return pd.DataFrame(columns=["date", "ml", "feed_type"])
 
     rows = []
     for record in all_records:
@@ -32,15 +32,15 @@ def load_data():
         rows.append([
             fields.get("date"),
             fields.get("ml"),
-            fields.get("type")
+            fields.get("feed_type")
         ])
 
-    df = pd.DataFrame(rows, columns=["date", "ml", "type"])
+    df = pd.DataFrame(rows, columns=["date", "ml", "feed_type"])
     df["date"] = pd.to_datetime(df["date"])
     return df
 
 # Save entry to Airtable
-def save_entry(date, ml, milk_type):
+def save_entry(date, ml, feed_type):
     url = f"https://api.airtable.com/v0/{st.secrets['AIRTABLE_BASE_ID']}/{st.secrets['AIRTABLE_TABLE_ID']}"
     headers = {
         "Authorization": f"Bearer {st.secrets['AIRTABLE_TOKEN']}",
@@ -50,7 +50,7 @@ def save_entry(date, ml, milk_type):
         "fields": {
             "date": date.strftime("%Y-%m-%d"),
             "ml": ml,
-            "type": milk_type
+            "feed_type": feed_type
         }
     }
     response = requests.post(url, headers=headers, json=data)
@@ -64,7 +64,7 @@ def plot_feedings(data, days):
         st.write("No data to display.")
         return
 
-    daily_totals = recent_data.groupby([recent_data["date"].dt.date, "type"])["ml"].sum().unstack().fillna(0)
+    daily_totals = recent_data.groupby([recent_data["date"].dt.date, "feed_type"])["ml"].sum().unstack().fillna(0)
     daily_totals = daily_totals.sort_index(ascending=False)
 
     fig, ax = plt.subplots()
@@ -81,11 +81,11 @@ st.subheader("Log a Feed")
 with st.form("feeding_form"):
     date = st.date_input("Date", value=datetime.today())
     ml = st.number_input("Amount of milk (ml)", min_value=0, max_value=1000, step=10)
-    milk_type = st.selectbox("Milk Type", ["Bottle", "Formula"])
+    feed_type = st.selectbox("Milk Type", ["Bottle", "Formula"])
     submitted = st.form_submit_button("Save")
 
     if submitted:
-        save_entry(date, ml, milk_type)
+        save_entry(date, ml, feed_type)
         st.success("Entry saved!")
 
 # Load and display data
@@ -94,4 +94,5 @@ data = load_data()
 st.subheader("Feeding Overview")
 days = st.slider("Show data for how many days?", 1, 30, 7)
 plot_feedings(data, days)
+
 
