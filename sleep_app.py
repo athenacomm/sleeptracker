@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
+from datetime import datetime
 import requests
 
 # Load data from Airtable
@@ -80,23 +80,17 @@ st.title("Baby Feeding Tracker")
 # Load data
 data = load_data()
 
-# Show time since last feed (safe version)
-st.subheader("Time Since Last Feed")
+# Show last feed time
+st.subheader("Last Feed Time")
 
 valid_times = data["Createdtime"].dropna() if "Createdtime" in data.columns else pd.Series()
 
 if not valid_times.empty:
-    try:
-        last_feed_time = pd.to_datetime(valid_times.max(), errors="coerce")
-        if pd.notnull(last_feed_time):
-            time_since = datetime.now() - last_feed_time.to_pydatetime()
-            hours, remainder = divmod(time_since.total_seconds(), 3600)
-            minutes = remainder // 60
-            st.info(f"🕒 Time since last feed: {int(hours)}h {int(minutes)}m")
-        else:
-            st.warning("Unable to read timestamp.")
-    except Exception as e:
-        st.error(f"Error calculating time: {e}")
+    last_feed_time = pd.to_datetime(valid_times.max(), errors="coerce")
+    if pd.notnull(last_feed_time):
+        st.info(f"🕒 Last feed was at {last_feed_time.strftime('%H:%M on %d %B %Y')}")
+    else:
+        st.warning("Unable to read timestamp.")
 else:
     st.warning("No feed times available.")
 
@@ -117,4 +111,3 @@ with st.form("feeding_form"):
 st.subheader("Feeding Overview")
 days = st.slider("Show data for how many days?", 1, 30, 7)
 plot_feedings(data, days)
-
